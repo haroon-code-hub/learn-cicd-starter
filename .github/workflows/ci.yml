@@ -38,7 +38,7 @@ jobs:
 
       - name: Check Go formatting
         run: |
-          FMT_OUT=$(gofmt -l .)
+          FMT_OUT=$(git ls-files '*.go' ':!:vendor/**' | xargs gofmt -l)
           if [ -n "$FMT_OUT" ]; then
             echo "Go files not properly formatted:"
             echo "$FMT_OUT"
