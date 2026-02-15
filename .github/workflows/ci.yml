@@ -8,7 +8,6 @@ jobs:
   tests:
     name: Tests
     runs-on: ubuntu-latest
-
     steps:
       - name: Check out code
         uses: actions/checkout@v4
@@ -18,5 +17,36 @@ jobs:
         with:
           go-version: "1.25.1"
 
-      - name: Verify Go Istallation
+      - name: Verify Go Installation
         run: go test ./... -cover
+      - name: Install gosec
+        run: go install github.com/securego/gosec/v2/cmd/gosec@latest
+      - name: Run gosec
+        run: gosec ./...
+
+  style:
+    name: Style
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.25.1"
+
+      - name: Check Go formatting
+        run: |
+          FMT_OUT=$(git ls-files '*.go' ':!:vendor/**' | xargs gofmt -l)
+          if [ -n "$FMT_OUT" ]; then
+            echo "Go files not properly formatted:"
+            echo "$FMT_OUT"
+            exit 1
+          fi
+
+      - name: Install staticcheck
+        run: go install honnef.co/go/tools/cmd/staticcheck@latest
+
+      - name: Run staticcheck
+        run: $(go env GOPATH)/bin/staticcheck ./...
