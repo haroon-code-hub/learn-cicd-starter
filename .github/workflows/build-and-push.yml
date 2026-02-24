@@ -1,0 +1,60 @@
+name: Build and Push (Artifact Registry)
+
+on:
+  push:
+    branches: ["main"]
+
+env:
+  PROJECT_ID: notely-487520
+  REGION: us-central1
+  REPOSITORY: notely-ar-repo
+  IMAGE_NAME: notely
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      # --- buildprod (Go project) ---
+      # If your course provides a script, this will run it.
+      # Otherwise it will just do a basic Go build (harmless + verifies Go compiles).
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: "1.22"
+
+      - name: Run buildprod
+        shell: bash
+        run: |
+          set -euo pipefail
+          if [ -f "./scripts/buildprod.sh" ]; then
+            chmod +x ./scripts/buildprod.sh
+            ./scripts/buildprod.sh
+          else
+            echo "No ./scripts/buildprod.sh found. Running a basic Go build instead."
+            go mod download
+            go build -v ./...
+          fi
+
+      # --- Authenticate + gcloud ---
+      - name: Authenticate to Google Cloud
+        uses: google-github-actions/auth@v2
+        with:
+          credentials_json: ${{ secrets.GCP_CREDENTIALS }}
+
+      - name: Set up gcloud
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ env.PROJECT_ID }}
+
+      # --- Build + Push to Artifact Registry via Cloud Build ---
+      - name: Build and Push Docker image (Cloud Build)
+        shell: bash
+        run: |
+          set -euo pipefail
+          IMAGE_TAG="${REGION}-docker.pkg.dev/${PROJECT_ID}/${REPOSITORY}/${IMAGE_NAME}:${GITHUB_SHA}"
+          echo "Building and pushing: ${IMAGE_TAG}"
+          gcloud builds submit --tag "${IMAGE_TAG}" .
